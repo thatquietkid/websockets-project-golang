@@ -9,6 +9,7 @@
     <div class="center">
         <h1>GoLang Chat Application</h1>
         <h3 id="chat-header">Currently in chat: general</h3>
+        <h3>Connected to a Websocket: false</h3>
         <form id="chatroom-selection">
             <label for="chatroom">Chatroom</label>
             <input type="text" id="chatroom" name="chatroom"><br><br>
@@ -21,9 +22,50 @@
             <label for="message">Message</label>
             <input type="text" id="message" name="message" placeholder="Type your message here...">
             <input type="submit" value="Send Message">
+        </form>
+        <div style="border: 3px solid black; margin-top: 30px;">
+            <form id="login-form">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Enter your username"><br>
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password"><br>
+                <input type="submit" value="Login">
+            </form>
+        </div>
     </div>
     <script>
         var selectedChat = "general";
+
+        class Event {
+            constructor(type, payload){
+                this.type = type;
+                this.payload = payload;
+            }
+        }
+        
+        function routeEvent(event){
+            if (event.type == undefined){
+                alert("no type field in the event");
+            }
+            switch(event.type) {
+                case "new_message":
+                    console.log("New message received: " + event.payload);
+                    break;
+                default:
+                    alert("unsupported message type");
+                    break;
+            }
+        }
+
+        function sendEvent(eventName, payload){
+            var event = new Event(eventName, payload);
+            if (conn.readyState == WebSocket.OPEN){
+                conn.send(JSON.stringify(event));
+            } else {
+                alert("WebSocket is not open. Cannot send event.");
+            }
+        }
+
         function changeChatRoom(){
             var newChat = document.getElementById("chatroom");
             if (newChat != null && newChat.value != selectedChat){
@@ -34,23 +76,60 @@
         function sendMessage() {
             var newmessage = document.getElementById("message");
             if (newmessage) {
-                conn.send(newmessage.value);
+                sendEvent("send message", newmessage.value);
+                newmessage.value = ""; // Clear the input field after sending
             }
             return false;
         }
-        window.onload = function() {
-            document.getElementById("chatroom-selection").onsubmit = changeChatRoom;
-            document.getElementById("chatroom-message").onsubmit = sendMessage;
-            if (window["WebSocket"]){
+        function login() {
+            let formData = {
+                "username": document.getElementById("username").value,
+                "password": document.getElementById("password").value
+            }
+            // Send the request
+            fetch("login", {
+                method: 'post',
+                body: JSON.stringify(formData),
+                mode: 'cors',
+            }).then((response) => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw 'unauthorized';
+                }
+            }).then((data) => {
+                // Now we have a OTP, send a Request to Connect to WebSocket
+                connectWebSocket(data.otp);
+            }).catch((e) => { alert(e) });
+            return false;
+        }
+        function connectWebSocket(otp) {
+            if (window["WebSocket"]) {
                 console.log("WebSocket is supported by your browser.");
                 //connect to ws
-                conn = new WebSocket("ws://" + document.location.host + "/ws");
+                conn = new WebSocket("ws://" + document.location.host + "/ws?otp=" + otp);
+
+                conn.onopen = function(e){
+                    document.getElementById("connection-header").innerHTML = "Connected to WebSocket: true"
+                }
+
+                conn.onclose = function(e){
+                    document.getElementById("connection-header").innerHTML = "Connected to WebSocket: false"
+                }
+
                 conn.onmessage = function(e) {
-                    console.log(e);
+                    const eventData = JSON.parse(e.data);
+                    const event = Object.assign(new Event, eventData);
+                    routeEvent(event);
                 }
             } else {
                 alert("WebSocket is not supported by your browser.");
             }
+        }
+        window.onload = function() {
+            document.getElementById("chatroom-selection").onsubmit = changeChatRoom;
+            document.getElementById("chatroom-message").onsubmit = sendMessage;
+            document.getElementById("login-form").onsubmit = login;
         }
     </script>
     <style type="text/css">

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 )
@@ -11,9 +12,10 @@ func main() {
 }
 
 func setupAPI() {
-
-	manager := NewManager()
+	ctx := context.Background()
+	manager := NewManager(ctx)
 	http.Handle("/", http.FileServer(http.Dir("./frontend")))
 	http.HandleFunc("/ws", manager.serveWS)
-	log.Println("API server started on :8080")
+	http.HandleFunc("/login", manager.LoginHandler)
+	log.Println("API server started on :8080\nReach the website via http://localhost:8080")
 }
