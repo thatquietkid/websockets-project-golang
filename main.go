@@ -8,7 +8,7 @@ import (
 
 func main() {
 	setupAPI()
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServeTLS(":8080", "server.crt", "server.key", nil))
 }
 
 func setupAPI() {
@@ -17,5 +17,5 @@ func setupAPI() {
 	http.Handle("/", http.FileServer(http.Dir("./frontend")))
 	http.HandleFunc("/ws", manager.serveWS)
 	http.HandleFunc("/login", manager.LoginHandler)
-	log.Println("API server started on :8080\nReach the website via http://localhost:8080")
+	log.Println("API server started on :8080\nReach the website via https://localhost:8080")
 }

@@ -40,10 +40,46 @@ func NewManager(ctx context.Context) *Manager {
 
 func (m *Manager) setupEventHandlers() {
 	m.handlers[EventSendMessage] = SendMessage
+	m.handlers[EventChangeRoom] = ChatRoomHandler
+}
+
+func ChatRoomHandler(event Event, c *Client) error {
+	var changeRoomEvent ChangeRoomEvent
+	if err := json.Unmarshal(event.Payload, &changeRoomEvent); err != nil {
+		return fmt.Errorf("error unmarshaling event payload: %w", err)
+	}
+
+	c.chatroom = changeRoomEvent.Name
+	return nil
 }
 
 func SendMessage(event Event, c *Client) error {
-	fmt.Println(event)
+	var chatevent SendMessageEvent
+	if err := json.Unmarshal(event.Payload, &chatevent); err != nil {
+		return fmt.Errorf("error unmarshaling event payload: %w", err)
+	}
+
+	var broadMessage NewMessageEvent
+	broadMessage.Sent = time.Now()
+	broadMessage.From = chatevent.From
+	broadMessage.Message = chatevent.Message
+	data, err := json.Marshal(broadMessage)
+	if err != nil {
+		return fmt.Errorf("error marshaling broadcast message: %w", err)
+	}
+	var outgoingEvent = Event{
+		Payload: data,
+		Type: EventNewMessage,
+	}
+
+	for client := range c.manager.clients {
+		if client.chatroom == "" {
+			continue // skip clients who never joined a room
+		}
+		if client.chatroom == c.chatroom {
+			client.egress <- outgoingEvent
+		}
+	}
 	return nil
 }
 
@@ -138,11 +174,10 @@ func checkOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 
 	switch origin {
-		case "http://localhost:8080":
+		case "https://localhost:8080":
 			return true
 		default:
 			log.Println("invalid origin:", origin)
 			return false
 	}
 }
-

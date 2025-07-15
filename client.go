@@ -20,6 +20,8 @@ type Client struct {
 
 	manager *Manager
 
+	chatroom string
+
 	// egress to avoid concurrent writes to the connection
 	egress chan Event
 }
@@ -29,6 +31,7 @@ func NewClient(conn *websocket.Conn, manager *Manager) *Client {
 		connection: conn,
 		manager:    manager,
 		egress:    make(chan Event), // buffered channel for outgoing messages
+		chatroom:   "general", 
 	}
 }
 

@@ -9,7 +9,7 @@
     <div class="center">
         <h1>GoLang Chat Application</h1>
         <h3 id="chat-header">Currently in chat: general</h3>
-        <h3>Connected to a Websocket: false</h3>
+        <h3 id="connection-header">Connected to a Websocket: false</h3>
         <form id="chatroom-selection">
             <label for="chatroom">Chatroom</label>
             <input type="text" id="chatroom" name="chatroom"><br><br>
@@ -42,6 +42,40 @@
                 this.payload = payload;
             }
         }
+
+        class SendMessageEvent {
+            constructor(message, from){
+                this.message = message;
+                this.from = from;
+            }
+        }
+
+        class NewMessageEvent {
+            constructor(message, from, sent){
+                this.message = message;
+                this.from = from;
+                this.sent = sent;
+            }
+        }
+
+        class ChangeChatRoomEvent {
+            constructor(name){
+                this.name = name;
+            }
+        }
+
+        function changeChatRoom(name) {
+            var newChat = document.getElementById("chatroom");
+            if (newChat != null && newChat.value != selectedChat) {
+                selectedChat = newChat.value;
+                header = document.getElementById("chat-header").innerHTML = "Currently in chat: " + selectedChat;
+                let changeEvent = new ChangeChatRoomEvent(selectedChat);
+                sendEvent("change_room", changeEvent);
+                textarea = document.getElementById("chat-messages");
+                textarea.value = "You changed room into: " + selectedChat; // Clear the chat messages area
+            }
+            return false;
+        }
         
         function routeEvent(event){
             if (event.type == undefined){
@@ -49,12 +83,21 @@
             }
             switch(event.type) {
                 case "new_message":
-                    console.log("New message received: " + event.payload);
+                    const MessageEvent = Object.assign(new NewMessageEvent, event.payload);
+                    appendChatMessage(MessageEvent);
+
                     break;
                 default:
                     alert("unsupported message type");
                     break;
             }
+        }
+
+        function appendChatMessage({ message, from, sent }) {
+            const chatMessages = document.getElementById("chat-messages");
+            const timestamp = new Date(sent).toLocaleTimeString();
+            chatMessages.value += `${from} (${timestamp}): ${message}\n`;  // ✅ Append to value
+            chatMessages.scrollTop = chatMessages.scrollHeight; // ✅ Auto-scroll
         }
 
         function sendEvent(eventName, payload){
@@ -66,17 +109,12 @@
             }
         }
 
-        function changeChatRoom(){
-            var newChat = document.getElementById("chatroom");
-            if (newChat != null && newChat.value != selectedChat){
-                console.log("Changing chatroom to: " + newChat.value);
-            }
-            return false;
-        }
         function sendMessage() {
             var newmessage = document.getElementById("message");
             if (newmessage) {
-                sendEvent("send message", newmessage.value);
+                let username = document.getElementById("username").value || "Anonymous";
+                let outgoingEvent = new SendMessageEvent(newmessage.value, username);
+                sendEvent("send message", outgoingEvent);
                 newmessage.value = ""; // Clear the input field after sending
             }
             return false;
@@ -107,7 +145,7 @@
             if (window["WebSocket"]) {
                 console.log("WebSocket is supported by your browser.");
                 //connect to ws
-                conn = new WebSocket("ws://" + document.location.host + "/ws?otp=" + otp);
+                conn = new WebSocket("wss://" + document.location.host + "/ws?otp=" + otp);
 
                 conn.onopen = function(e){
                     document.getElementById("connection-header").innerHTML = "Connected to WebSocket: true"
