@@ -37,12 +37,23 @@ A real-time web-based chatroom built using **Golang**, **WebSockets**, and **Ope
 chatapp/
 │
 ├── main.go                  # Go WebSocket + HTTP server
-├── handlers.go              # Room, login, and socket frontend
-├── index.html               # Full frontend UI
+├── manager.go              # Room, login, and socket frontend
 ├── cert/
 │   ├── cert.pem             # SSL certificate (OpenSSL)
 │   └── key.pem              # SSL key (OpenSSL)
 ├── go.mod
+├── go.sum
+├── gencert.sh               # Script to generate SSL certs
+├── .gitignore                # Git ignore file
+├── otp.go
+├── event.go
+├── client.go
+├── screenshot.png
+├── screenshots/             # Directory for screenshots
+│   ├── login.png            # Login screenshot
+│   └── chat.png             # Chat view screenshot
+├── frontend/
+│   └── index.html           # Frontend HTML file
 └── README.md
 ```
 
