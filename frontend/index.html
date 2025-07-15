@@ -3,38 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Websockets with golang</title>
+    <title>Lowkey chatroom</title>
 </head>
 <body>
-    <div class="center">
-        <h1>GoLang Chat Application</h1>
-        <h3 id="chat-header">Currently in chat: general</h3>
-        <h3 id="connection-header">Connected to a Websocket: false</h3>
-        <form id="chatroom-selection">
-            <label for="chatroom">Chatroom</label>
-            <input type="text" id="chatroom" name="chatroom"><br><br>
-            <input type="submit" value="Join Chatroom">
-        </form>
-        <br>
-        <textarea class="messagearea" id="chat-messages" readonly rows="4" cols="50" placeholder="Welcome to Chatroom"></textarea>
-        <br>
-        <form id="chatroom-message">
-            <label for="message">Message</label>
-            <input type="text" id="message" name="message" placeholder="Type your message here...">
-            <input type="submit" value="Send Message">
-        </form>
-        <div style="border: 3px solid black; margin-top: 30px;">
-            <form id="login-form">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" placeholder="Enter your username"><br>
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" placeholder="Enter your password"><br>
-                <input type="submit" value="Login">
-            </form>
+    <div class="imessage-container">
+        <!-- Header -->
+        <div class="imessage-header">
+            <div class="header-content">
+                <div class="contact-info">
+                    <div class="contact-name" id="chat-header">general</div>
+                    <div class="contact-status" id="connection-header">Not Connected</div>
+                </div>
+                <div class="header-actions">
+                    <button class="header-btn" id="info-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages Area -->
+        <div class="messages-container">
+            <div class="messages-content" id="messages-content">
+                <div class="welcome-message">
+                    <div class="system-message">Welcome to Chatroom</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-container">
+            <div class="input-wrapper">
+                <form id="chatroom-message" class="message-form">
+                    <div class="input-group">
+                        <input type="text" id="message" name="message" placeholder="Please login to send messages" class="message-input" disabled>
+                        <button type="submit" class="send-btn" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Settings Panel (Initially Hidden) -->
+        <div class="settings-panel" id="settings-panel">
+            <div class="settings-content">
+                <div class="settings-header">
+                    <h3>Settings</h3>
+                    <button class="close-btn" id="close-settings">×</button>
+                </div>
+                
+                <div class="settings-section">
+                    <form id="chatroom-selection">
+                        <label for="chatroom">Change Chatroom</label>
+                        <div class="input-group">
+                            <input type="text" id="chatroom" name="chatroom" placeholder="Enter chatroom name">
+                            <input type="submit" value="Join" class="join-btn">
+                        </div>
+                    </form>
+                </div>
+
+                <div class="settings-section">
+                    <form id="login-form">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" placeholder="Enter your username">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" placeholder="Enter your password">
+                        <input type="submit" value="Login" class="login-btn">
+                    </form>
+                    <button class="logout-btn" id="logout-btn">Logout</button>
+                </div>
+            </div>
         </div>
     </div>
+
+    <!-- Hidden textarea for backward compatibility -->
+    <textarea id="chat-messages" style="display: none;"></textarea>
+
     <script>
         var selectedChat = "general";
+        var isLoggedIn = false;
+        var conn = null;
 
         class Event {
             constructor(type, payload){
@@ -68,11 +124,18 @@
             var newChat = document.getElementById("chatroom");
             if (newChat != null && newChat.value != selectedChat) {
                 selectedChat = newChat.value;
-                header = document.getElementById("chat-header").innerHTML = "Currently in chat: " + selectedChat;
+                document.getElementById("chat-header").innerHTML = selectedChat;
                 let changeEvent = new ChangeChatRoomEvent(selectedChat);
                 sendEvent("change_room", changeEvent);
-                textarea = document.getElementById("chat-messages");
-                textarea.value = "You changed room into: " + selectedChat; // Clear the chat messages area
+                
+                // Clear messages and show room change
+                const messagesContent = document.getElementById("messages-content");
+                messagesContent.innerHTML = `
+                    <div class="system-message">You joined ${selectedChat}</div>
+                `;
+                
+                // Update hidden textarea for compatibility
+                document.getElementById("chat-messages").value = "You changed room into: " + selectedChat;
             }
             return false;
         }
@@ -85,7 +148,6 @@
                 case "new_message":
                     const MessageEvent = Object.assign(new NewMessageEvent, event.payload);
                     appendChatMessage(MessageEvent);
-
                     break;
                 default:
                     alert("unsupported message type");
@@ -94,10 +156,32 @@
         }
 
         function appendChatMessage({ message, from, sent }) {
+            const messagesContent = document.getElementById("messages-content");
+            const timestamp = new Date(sent).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const currentUser = document.getElementById("username").value || "Anonymous";
+            const isOwnMessage = from === currentUser;
+            
+            // Create message bubble
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isOwnMessage ? 'own-message' : 'other-message'}`;
+            
+            messageDiv.innerHTML = `
+                <div class="message-bubble">
+                    <div class="message-text">${message}</div>
+                </div>
+                <div class="message-info">
+                    <span class="message-sender">${from}</span>
+                    <span class="message-time">${timestamp}</span>
+                </div>
+            `;
+            
+            messagesContent.appendChild(messageDiv);
+            messagesContent.scrollTop = messagesContent.scrollHeight;
+            
+            // Update hidden textarea for compatibility
             const chatMessages = document.getElementById("chat-messages");
-            const timestamp = new Date(sent).toLocaleTimeString();
-            chatMessages.value += `${from} (${timestamp}): ${message}\n`;  // ✅ Append to value
-            chatMessages.scrollTop = chatMessages.scrollHeight; // ✅ Auto-scroll
+            chatMessages.value += `${from} (${timestamp}): ${message}\n`;
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
         function sendEvent(eventName, payload){
@@ -110,21 +194,26 @@
         }
 
         function sendMessage() {
+            if (!isLoggedIn) {
+                alert("Please login first to send messages");
+                return false;
+            }
+            
             var newmessage = document.getElementById("message");
-            if (newmessage) {
+            if (newmessage && newmessage.value.trim()) {
                 let username = document.getElementById("username").value || "Anonymous";
                 let outgoingEvent = new SendMessageEvent(newmessage.value, username);
                 sendEvent("send message", outgoingEvent);
-                newmessage.value = ""; // Clear the input field after sending
+                newmessage.value = "";
             }
             return false;
         }
+
         function login() {
             let formData = {
                 "username": document.getElementById("username").value,
                 "password": document.getElementById("password").value
             }
-            // Send the request
             fetch("login", {
                 method: 'post',
                 body: JSON.stringify(formData),
@@ -136,23 +225,50 @@
                     throw 'unauthorized';
                 }
             }).then((data) => {
-                // Now we have a OTP, send a Request to Connect to WebSocket
                 connectWebSocket(data.otp);
+                // Hide settings panel on successful login
+                document.getElementById("settings-panel").classList.remove("show");
+                isLoggedIn = true;
+                enableChatInput();
+                document.getElementById("login-form").style.display = "none";
+                document.getElementById("logout-btn").style.display = "block";
             }).catch((e) => { alert(e) });
             return false;
         }
+
+        function enableChatInput() {
+            const messageInput = document.getElementById("message");
+            const sendBtn = document.querySelector(".send-btn");
+            
+            messageInput.disabled = false;
+            messageInput.placeholder = "Text Message";
+            sendBtn.disabled = false;
+            sendBtn.classList.remove("disabled");
+        }
+
+        function disableChatInput() {
+            const messageInput = document.getElementById("message");
+            const sendBtn = document.querySelector(".send-btn");
+            
+            messageInput.disabled = true;
+            messageInput.placeholder = "Please login to send messages";
+            sendBtn.disabled = true;
+            sendBtn.classList.add("disabled");
+        }
+
         function connectWebSocket(otp) {
             if (window["WebSocket"]) {
                 console.log("WebSocket is supported by your browser.");
-                //connect to ws
                 conn = new WebSocket("wss://" + document.location.host + "/ws?otp=" + otp);
 
                 conn.onopen = function(e){
-                    document.getElementById("connection-header").innerHTML = "Connected to WebSocket: true"
+                    document.getElementById("connection-header").innerHTML = "Connected"
                 }
 
                 conn.onclose = function(e){
-                    document.getElementById("connection-header").innerHTML = "Connected to WebSocket: false"
+                    document.getElementById("connection-header").innerHTML = "Not Connected"
+                    isLoggedIn = false;
+                    disableChatInput();
                 }
 
                 conn.onmessage = function(e) {
@@ -164,167 +280,478 @@
                 alert("WebSocket is not supported by your browser.");
             }
         }
+
+        function logout() {
+            if (conn && conn.readyState === WebSocket.OPEN) {
+                conn.close(); // close the websocket connection
+            }
+
+            // Reset the UI
+            isLoggedIn = false;
+            document.getElementById("username").value = "";
+            document.getElementById("password").value = "";
+            disableChatInput();
+            document.getElementById("chat-header").innerHTML = "general";
+            document.getElementById("connection-header").innerHTML = "Not Connected";
+            document.getElementById("messages-content").innerHTML = `
+                <div class="system-message">You have been logged out</div>
+            `;
+
+            // Show login modal again
+            document.getElementById("login-form").style.display = "block";
+            document.getElementById("settings-panel").classList.add("show");
+            document.getElementById("logout-btn").style.display = "none";
+        }
+
         window.onload = function() {
             document.getElementById("chatroom-selection").onsubmit = changeChatRoom;
             document.getElementById("chatroom-message").onsubmit = sendMessage;
             document.getElementById("login-form").onsubmit = login;
+            document.getElementById("logout-btn").onclick = logout;
+            
+            // Show login popup on page load
+            document.getElementById("settings-panel").classList.add("show");
+            
+            // Settings panel toggle
+            document.getElementById("info-btn").onclick = function() {
+                document.getElementById("settings-panel").classList.add("show");
+            }
+            
+            document.getElementById("close-settings").onclick = function() {
+                document.getElementById("settings-panel").classList.remove("show");
+            }
         }
     </script>
+
     <style type="text/css">
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
         * {
+            margin: 0;
+            padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
-            overflow: hidden;
-            padding: 0;
-            margin: 0;
-            width: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #000;
             height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+        }
+
+        .logout-btn {
+            background-color: #ff3b30;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+            width: 100%;
+            transition: background-color 0.2s;
+            display: none;
+        }
+        .logout-btn:hover {
+            background-color: #c92a21;
+        }
+
+        .imessage-container {
+            height: 100vh;
+            max-width: 400px;
+            margin: 0 auto;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Header */
+        .imessage-header {
+            background-color: #1c1c1e;
+            padding: 8px 16px;
+            border-bottom: 1px solid #2c2c2e;
+            position: relative;
+            z-index: 10;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 44px;
+        }
+
+        .contact-info {
+            text-align: center;
+            flex: 1;
+        }
+
+        .contact-name {
+            color: #ffffff;
+            font-size: 17px;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .contact-status {
+            color: #8e8e93;
+            font-size: 13px;
+            margin-top: 2px;
+        }
+
+        .header-actions {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .header-btn {
+            background: none;
+            border: none;
+            color: #007aff;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+
+        .header-btn:hover {
+            background-color: #2c2c2e;
+        }
+
+        /* Messages */
+        .messages-container {
+            flex: 1;
+            background-color: #000;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .messages-content {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .system-message {
+            text-align: center;
+            color: #8e8e93;
+            font-size: 13px;
+            margin: 16px 0;
+        }
+
+        .message {
+            display: flex;
+            flex-direction: column;
+            max-width: 70%;
+            margin-bottom: 8px;
+        }
+
+        .own-message {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+
+        .other-message {
+            align-self: flex-start;
+            align-items: flex-start;
+        }
+
+        .message-bubble {
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 100%;
+            word-wrap: break-word;
+            position: relative;
+        }
+
+        .own-message .message-bubble {
+            background-color: #007aff;
+            color: white;
+        }
+
+        .other-message .message-bubble {
+            background-color: #2c2c2e;
+            color: white;
+        }
+
+        .message-text {
+            font-size: 16px;
+            line-height: 1.3;
+        }
+
+        .message-info {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+            font-size: 12px;
+            color: #8e8e93;
+        }
+
+        .own-message .message-info {
+            flex-direction: row-reverse;
+        }
+
+        /* Input Area */
+        .input-container {
+            background-color: #1c1c1e;
+            padding: 8px 16px 34px 16px;
+            border-top: 1px solid #2c2c2e;
+        }
+
+        .input-wrapper {
+            background-color: #2c2c2e;
+            border-radius: 20px;
+            padding: 8px;
+        }
+
+        .message-form {
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            gap: 8px;
+        }
+
+        .message-input {
+            flex: 1;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 16px;
+            padding: 8px 12px;
+            outline: none;
+            resize: none;
+        }
+
+        .message-input::placeholder {
+            color: #8e8e93;
+        }
+
+        .send-btn {
+            background-color: #007aff;
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
         }
-        
-        .center {
-            width: 90%;
-            max-width: 500px;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+
+        .send-btn:hover {
+            background-color: #0056b3;
         }
-        
-        h1 {
-            color: #2d3748;
-            text-align: center;
-            margin-bottom: 0.5rem;
-            font-weight: 700;
-            font-size: 2rem;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+
+        .send-btn:disabled,
+        .send-btn.disabled {
+            background-color: #3a3a3c;
+            cursor: not-allowed;
         }
-        
-        h3 {
-            color: #4a5568;
-            text-align: center;
-            margin-bottom: 1.5rem;
-            font-weight: 500;
-            font-size: 1rem;
-            opacity: 0.8;
+
+        .send-btn:disabled:hover,
+        .send-btn.disabled:hover {
+            background-color: #3a3a3c;
         }
-        
-        form {
-            margin-bottom: 1.5rem;
+
+        .message-input:disabled {
+            color: #8e8e93;
+            cursor: not-allowed;
         }
-        
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #4a5568;
-            font-weight: 500;
-            font-size: 0.9rem;
-        }
-        
-        input[type="text"] {
+
+        /* Settings Panel */
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
-            padding: 0.75rem 1rem;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 1rem;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
             transition: all 0.3s ease;
-            background: white;
-            color: #2d3748;
-            margin-bottom: 1rem;
+            z-index: 1000;
         }
-        
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-            transform: translateY(-1px);
+
+        .settings-panel.show {
+            opacity: 1;
+            visibility: visible;
         }
-        
-        input[type="submit"] {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+
+        .settings-content {
+            background-color: #1c1c1e;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 320px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .settings-header h3 {
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #8e8e93;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+        }
+
+        .settings-section {
+            margin-bottom: 24px;
+        }
+
+        .settings-section label {
+            display: block;
+            color: #8e8e93;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .settings-section input[type="text"],
+        .settings-section input[type="password"] {
+            width: 100%;
+            background-color: #2c2c2e;
+            border: none;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+
+        .settings-section input[type="text"]:focus,
+        .settings-section input[type="password"]:focus {
+            outline: 2px solid #007aff;
+        }
+
+        .settings-section input[type="text"]::placeholder,
+        .settings-section input[type="password"]::placeholder {
+            color: #8e8e93;
+        }
+
+        .join-btn,
+        .login-btn {
+            background-color: #007aff;
             color: white;
             border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 500;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
             width: 100%;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            transition: background-color 0.2s;
         }
-        
-        input[type="submit"]:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+
+        .join-btn:hover,
+        .login-btn:hover {
+            background-color: #0056b3;
         }
-        
-        input[type="submit"]:active {
-            transform: translateY(0);
-        }
-        
-        .messagearea {
-            width: 100%;
-            min-height: 200px;
-            padding: 1rem;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 0.9rem;
-            font-family: 'Inter', sans-serif;
-            resize: vertical;
-            background: #f8fafc;
-            color: #4a5568;
-            margin-bottom: 1rem;
-            transition: all 0.3s ease;
-        }
-        
-        .messagearea:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-            background: white;
-        }
-        
-        /* Subtle animations */
-        .center {
-            animation: fadeInUp 0.6s ease-out;
-        }
-        
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        /* Responsive design */
-        @media (max-width: 600px) {
-            .center {
-                width: 95%;
-                padding: 1.5rem;
+
+        /* Responsive */
+        @media (max-width: 430px) {
+            .imessage-container {
+                max-width: 100%;
             }
             
-            h1 {
-                font-size: 1.5rem;
+            .imessage-header {
+                padding: 12px 16px;
             }
+            
+            .contact-name {
+                font-size: 16px;
+            }
+            
+            .contact-status {
+                font-size: 12px;
+            }
+            
+            .messages-container {
+                padding: 12px;
+            }
+            
+            .message {
+                max-width: 85%;
+            }
+            
+            .input-container {
+                padding: 8px 12px 20px 12px;
+            }
+            
+            .settings-content {
+                width: 95%;
+                margin: 20px;
+                padding: 20px;
+                max-height: 90vh;
+            }
+        }
+
+        @media (max-width: 375px) {
+            .message-bubble {
+                padding: 10px 14px;
+            }
+            
+            .message-text {
+                font-size: 15px;
+            }
+            
+            .message-input {
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+            
+            .settings-content {
+                padding: 16px;
+            }
+        }
+
+        @media (max-height: 600px) {
+            .settings-content {
+                max-height: 85vh;
+            }
+            
+            .messages-container {
+                padding: 8px;
+            }
+        }
+
+        /* Scrollbar styling */
+        .messages-container::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .messages-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .messages-container::-webkit-scrollbar-thumb {
+            background-color: #3a3a3c;
+            border-radius: 2px;
         }
     </style>
 </body>
