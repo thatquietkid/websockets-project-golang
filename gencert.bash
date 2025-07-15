@@ -1,5 +1,5 @@
 #!/bin/bash
-
+cd cert || exit 1
 echo "creating server key"
 openssl genrsa  -out server.key 2048
 openssl ecparam -genkey -name secp384r1 -out server.key

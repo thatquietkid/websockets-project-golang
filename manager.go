@@ -135,7 +135,7 @@ func (m *Manager) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Username and password are required", http.StatusBadRequest)
 		return
 	}
-	if req.Username == "admin" || req.Password == "qwer1234" {
+	if req.Username == "admin" || req.Password == "admin1234" {
 		type response struct{
 			OTP string `json:"otp"`
 		}
