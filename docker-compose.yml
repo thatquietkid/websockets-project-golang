@@ -1,0 +1,18 @@
+# docker-compose.yml
+services:
+  # Go application
+  app:
+    build: . 
+    container_name: go-app-container
+    ports:
+      - "8080:8080" 
+
+  # Prometheus container
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-container
+    volumes:
+      # Mount the prometheus.yml config file into the container
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090" # Expose the Prometheus UI port

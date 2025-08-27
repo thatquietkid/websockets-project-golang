@@ -105,13 +105,20 @@ docker build -t chatapp .
 docker run -p 8080:8080 chatapp
 ```
 
+Using Docker Compose to run the application + Prometheus:
+
+```docker
+docker compose up --build
+```
+
 > The server starts on `https://localhost:8080`.
+> You can access the Prometheus UI at `http://localhost:9090`. (Only while using Docker Compose)
 
 ---
 
-## 🧪 Sample Users
+## 🧪 Mock Login
 
-> You can mock login with any username/password combo. OTP or JWT-based login expected in production.
+> You can mock login with the following username/password combo. OTP or JWT-based login expected in production.
 ```
 Current user: admin
 Password: admin1234

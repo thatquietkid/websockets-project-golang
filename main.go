@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -17,5 +18,6 @@ func setupAPI() {
 	http.Handle("/", http.FileServer(http.Dir("./frontend")))
 	http.HandleFunc("/ws", manager.serveWS)
 	http.HandleFunc("/login", manager.LoginHandler)
+	http.Handle("/metrics", promhttp.Handler())
 	log.Println("API server started on :8080\nReach the website via https://localhost:8080")
 }

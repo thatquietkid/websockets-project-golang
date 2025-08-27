@@ -1,0 +1,16 @@
+# prometheus.yml
+scrape_configs:
+  - job_name: 'go-webapp'
+    scrape_interval: 15s
+    
+    # Tell Prometheus to use HTTPS for this job
+    scheme: https
+    
+    # Since the Go app is using a self-signed certificate, we need
+    # to tell Prometheus to skip the certificate verification.
+    # This is safe within the Docker network.
+    tls_config:
+      insecure_skip_verify: true
+      
+    static_configs:
+      - targets: ['app:8080']
