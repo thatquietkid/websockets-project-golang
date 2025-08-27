@@ -6,6 +6,20 @@ A real-time web-based chatroom built using **Golang**, **WebSockets**, and **Ope
 
 ---
 
+## Sections
+- [Features](#-features)
+- [Technologies Used](#-technologies-used)
+- [Project Structure](#-project-structure)
+- [Getting Started](#-getting-started)
+- [Sample Users](#-sample-users)
+- [How It Works](#-how-it-works)
+- [Future Improvements](#future-improvements)
+- [Screenshots](#-screenshots)
+- [Contributions](#-contributions)
+- [License](#-license)
+
+---
+
 ## ⚙️ Features
 
 - 🧠 Built in **Go** using the `net/http` and `gorilla/websocket` packages
@@ -35,26 +49,24 @@ A real-time web-based chatroom built using **Golang**, **WebSockets**, and **Ope
 
 ```
 chatapp/
-│
-├── main.go                  # Go WebSocket + HTTP server
-├── manager.go              # Room, login, and socket frontend
-├── cert/
-│   ├── cert.pem             # SSL certificate (OpenSSL)
-│   └── key.pem              # SSL key (OpenSSL)
+├── .gitignore
+├── Dockerfile
+├── LICENSE
+├── README.md
+├── client.go
+├── event.go
+├── frontend
+    └── index.html
+├── gencert.bash
 ├── go.mod
 ├── go.sum
-├── gencert.sh               # Script to generate SSL certs
-├── .gitignore                # Git ignore file
+├── main.go
+├── manager.go
 ├── otp.go
-├── event.go
-├── client.go
 ├── screenshot.png
-├── screenshots/             # Directory for screenshots
-│   ├── login.png            # Login screenshot
-│   └── chat.png             # Chat view screenshot
-├── frontend/
-│   └── index.html           # Frontend HTML file
-└── README.md
+├── screenshots
+    ├── chat.png
+    └── login.png
 ```
 
 ---
@@ -71,15 +83,26 @@ cd websockets-project-golang
 ### 2. Generate SSL Certificate (if not already)
 
 ```bash
+sudo apt update
+sudo apt install openssl
+mkdir cert
 bash gencert.sh
 ```
-
-> Use localhost (127.0.0.1) as Common Name when prompted.
+> Change apt to your system's package manager (e.g., yum, dnf).
 
 ### 3. Run the Server
 
+Using Go:
 ```bash
+go build .
 go run main.go
+```
+
+Using Docker:
+
+```docker
+docker build -t chatapp .
+docker run -p 8080:8080 chatapp
 ```
 
 > The server starts on `https://localhost:8080`.
